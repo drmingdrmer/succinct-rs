@@ -1,19 +1,19 @@
 use lazy_static::lazy_static;
 
-use crate::bitmap::BitmapQuery;
-use crate::context::LookupTable;
-use crate::indexed_bitmap::IndexedBitmap;
-use crate::rank::RankIndex64;
-use crate::select::SelectIndex32;
+use crate::bitmap::bitmap_ops::BitmapOps;
+use crate::bitmap::context::Context;
+use crate::bitmap::indexed_bitmap::IndexedBitmap;
+use crate::bitmap::rank::RankIndex64;
+use crate::bitmap::select::SelectIndex32;
 
 lazy_static! {
-    pub static ref CTX: LookupTable = LookupTable::new();
+    pub static ref CTX: Context = Context::new();
 }
 
 pub type LabelBitmap = IndexedBitmap<SelectIndex32<RankIndex64>>;
 
 pub struct StaticKV<LBM>
-where LBM: BitmapQuery
+where LBM: BitmapOps
 {
     pub leaves: Vec<u64>,
     pub label_bitmap: LBM,
@@ -22,7 +22,7 @@ where LBM: BitmapQuery
 
 /// The breadth first walking state node
 #[derive(Debug)]
-struct QueueElt {
+struct BFSNode {
     /// The index of the starting key reachable from a trie node.
     start: usize,
 
@@ -33,15 +33,18 @@ struct QueueElt {
     col: usize,
 }
 
-impl QueueElt {
+impl BFSNode {
     #[allow(dead_code)]
     pub fn new(start: usize, end: usize, col: usize) -> Self {
-        QueueElt { start, end, col }
+        BFSNode { start, end, col }
+    }
+    pub fn unpack(&self) -> (usize, usize, usize) {
+        (self.start, self.end, self.col)
     }
 }
 
 impl<LBM> StaticKV<LBM>
-where LBM: BitmapQuery
+where LBM: BitmapOps
 {
     /// Build a compacted trie from a sorted list of keys.
     #[allow(dead_code)]
@@ -49,45 +52,43 @@ where LBM: BitmapQuery
         let mut leaves = vec![];
         let mut label_bitmap = vec![];
         let mut labels = vec![];
-        let mut label_index = 0;
 
-        let mut queue = vec![QueueElt::new(0, keys.len(), 0)];
+        let mut queue = vec![BFSNode::new(0, keys.len(), 0)];
 
-        let mut i = 0;
-        while i < queue.len() {
-            let (mut start, end, col) = {
-                let elt = &queue[i];
-                (elt.start, elt.end, elt.col)
-            };
+        let mut node_id = 0;
+        let mut bitmap_index = 0;
+
+        while node_id < queue.len() {
+            let (mut start, end, col) = queue[node_id].unpack();
 
             if col == keys[start].len() {
                 // leaf node
                 start += 1;
-                set_bit(&mut leaves, i, 1);
+                set_bit(&mut leaves, node_id, 1);
             }
 
             let mut j = start;
 
             while j < end {
                 let frm = j;
-                let first = keys[frm][col];
+                let label = keys[frm][col];
 
-                while j < end && keys[j][col] == first {
+                while j < end && keys[j][col] == label {
                     j += 1;
                 }
 
                 // new label
 
-                queue.push(QueueElt::new(frm, j, col + 1));
-                labels.push(first);
-                set_bit(&mut label_bitmap, label_index, 0);
-
-                label_index += 1;
+                queue.push(BFSNode::new(frm, j, col + 1));
+                labels.push(label);
+                set_bit(&mut label_bitmap, bitmap_index, 0);
+                bitmap_index += 1;
             }
 
-            set_bit(&mut label_bitmap, label_index, 1);
-            label_index += 1;
-            i += 1;
+            set_bit(&mut label_bitmap, bitmap_index, 1);
+            bitmap_index += 1;
+
+            node_id += 1;
         }
 
         StaticKV {
@@ -102,26 +103,26 @@ impl StaticKV<LabelBitmap> {
     #[allow(dead_code)]
     pub fn has(&self, key: &[u8]) -> bool {
         let mut node_id: i32 = 0;
-        let mut label_bitmap_index: i32 = 0;
+        let mut bitmap_index: i32 = 0;
 
         for c in key {
             loop {
-                if get_bit(&self.label_bitmap.words, label_bitmap_index as usize) != 0 {
+                if get_bit(&self.label_bitmap.words, bitmap_index as usize) != 0 {
                     // no more labels in this node
                     return false;
                 }
 
-                if self.labels[(label_bitmap_index - node_id) as usize] == *c {
+                if self.labels[(bitmap_index - node_id) as usize] == *c {
                     // matched
                     break;
                 }
 
-                label_bitmap_index += 1;
+                bitmap_index += 1;
             }
 
             // go to next level
-            node_id = self.label_bitmap.count_zeros(label_bitmap_index + 1).0;
-            label_bitmap_index = self.label_bitmap.select_ith_one(node_id - 1) + 1;
+            node_id = self.label_bitmap.count_zeros(bitmap_index + 1).0;
+            bitmap_index = self.label_bitmap.select_ith_one(node_id - 1) + 1;
         }
 
         get_bit(&self.leaves, node_id as usize) != 0

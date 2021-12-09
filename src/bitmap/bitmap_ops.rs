@@ -1,4 +1,5 @@
-pub trait BitmapQuery {
+/// Bitmap API
+pub trait BitmapOps {
     fn new(words: Vec<u64>) -> Self;
 
     /// Calculate the rank at index `i`:

@@ -1,7 +1,7 @@
-use crate::index::BuildIndex;
-use crate::index::SelectRankIndex;
-use crate::select::SelectIndex32;
-use crate::select::SelectLookup8;
+use crate::bitmap::index::BuildIndex;
+use crate::bitmap::index::SelectRankIndex;
+use crate::bitmap::select::SelectIndex32;
+use crate::bitmap::select::SelectLookup8;
 
 #[test]
 fn test_select_lookup_8() -> anyhow::Result<()> {

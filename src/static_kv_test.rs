@@ -1,8 +1,8 @@
 use pretty_assertions::assert_eq;
 
-use crate::fmt::fmt_bitmap;
-use crate::index::RankIndex;
-use crate::index::SelectRankIndex;
+use crate::bitmap::fmt::fmt_bitmap;
+use crate::bitmap::index::RankIndex;
+use crate::bitmap::index::SelectRankIndex;
 use crate::static_kv::LabelBitmap;
 use crate::static_kv::StaticKV;
 
@@ -134,8 +134,8 @@ fn test_kv() -> anyhow::Result<()> {
         let got = WantType {
             leaves: fmt_bitmap(&s.leaves),
             label_bitmap: fmt_bitmap(&s.label_bitmap.words),
-            rank_index: RankIndex::get_rank_data(&s.label_bitmap.index).to_vec(),
-            select_index: SelectRankIndex::get_select_data(&s.label_bitmap.index).to_vec(),
+            rank_index: RankIndex::get_rank_index(&s.label_bitmap.index).to_vec(),
+            select_index: SelectRankIndex::get_select_index(&s.label_bitmap.index).to_vec(),
             labels: String::from_utf8(s.labels.clone()).unwrap(),
         };
 

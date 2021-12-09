@@ -1,9 +1,9 @@
-use crate::bitmap::BitmapQuery;
-use crate::index::BuildIndex;
-use crate::index::RankIndex;
-use crate::index::SelectRankIndex;
-use crate::rank::RankIndex64;
-use crate::select::SelectIndex32;
+use crate::bitmap::bitmap_ops::BitmapOps;
+use crate::bitmap::index::BuildIndex;
+use crate::bitmap::index::RankIndex;
+use crate::bitmap::index::SelectRankIndex;
+use crate::bitmap::rank::RankIndex64;
+use crate::bitmap::select::SelectIndex32;
 
 pub struct IndexedBitmap<SI>
 where SI: SelectRankIndex
@@ -12,7 +12,7 @@ where SI: SelectRankIndex
     pub index: SI,
 }
 
-impl BitmapQuery for IndexedBitmap<SelectIndex32<RankIndex64>> {
+impl BitmapOps for IndexedBitmap<SelectIndex32<RankIndex64>> {
     fn new(words: Vec<u64>) -> Self {
         let si = SelectIndex32::<RankIndex64>::build(&words);
         Self { words, index: si }

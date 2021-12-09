@@ -1,13 +1,13 @@
 use std::fmt::Debug;
 
-use crate::context::LookupTable;
-use crate::index::BuildIndex;
-use crate::index::RankIndex;
-use crate::index::SelectRankIndex;
-use crate::rank::RankIndex64;
+use crate::bitmap::context::Context;
+use crate::bitmap::index::BuildIndex;
+use crate::bitmap::index::RankIndex;
+use crate::bitmap::index::SelectRankIndex;
+use crate::bitmap::rank::RankIndex64;
 use crate::static_kv::CTX;
 
-// Select8Lookup is a lookup table for "select" on 8-bit bitmap:
+// SelectLookup8 is a lookup table for "select" on 8-bit bitmap:
 // It stores the result of select(b, ith) in
 // select8Lookup[b*256+ith].
 pub struct SelectLookup8 {
@@ -52,10 +52,10 @@ impl SelectLookup8 {
 pub struct SelectIndex32<RI>
 where RI: RankIndex + Debug + Clone
 {
-    pub data: Vec<i32>,
+    pub index: Vec<i32>,
     pub rank_index: RI,
 
-    pub ctx: &'static LookupTable,
+    pub ctx: &'static Context,
 }
 
 impl<RI> BuildIndex for SelectIndex32<RI>
@@ -64,20 +64,21 @@ where RI: RankIndex + Debug + Clone
     fn build(words: &[u64]) -> Self {
         let index = build_select32_index(words);
         SelectIndex32 {
-            data: index,
+            index,
             rank_index: RI::build(words),
             ctx: &*CTX,
         }
     }
 }
 
+/// SelectIndex32 depends on a rank index.
 impl RankIndex for SelectIndex32<RankIndex64> {
     fn count_ones(&self, words: &[u64], i: i32) -> (i32, i32) {
         self.rank_index.count_ones(words, i)
     }
 
-    fn get_rank_data(&self) -> &[i32] {
-        &self.rank_index.get_rank_data()
+    fn get_rank_index(&self) -> &[i32] {
+        &self.rank_index.get_rank_index()
     }
 }
 
@@ -85,15 +86,15 @@ impl SelectRankIndex for SelectIndex32<RankIndex64> {
     fn select_ith_one(&self, words: &[u64], i: i32) -> i32 {
         select_s32_r64(
             words,
-            &self.get_select_data(),
-            &self.rank_index.get_rank_data(),
+            &self.get_select_index(),
+            &self.rank_index.get_rank_index(),
             self.ctx,
             i,
         )
     }
 
-    fn get_select_data(&self) -> &[i32] {
-        &self.data
+    fn get_select_index(&self) -> &[i32] {
+        &self.index
     }
 }
 
@@ -135,7 +136,7 @@ pub fn select_s32_r64(
     words: &[u64],
     select_index: &[i32],
     rank_index: &[i32],
-    context: &LookupTable,
+    context: &Context,
     i: i32,
 ) -> i32 {
     // find the word that contains i/32-th `1`.
@@ -180,12 +181,12 @@ pub fn select_s32_r64(
         // The `1` to find is in the second 8 bits.
 
         let x = (((ww as usize) >> 5) & 0x7f8) | ((find_ith - ones) as usize);
-        base + context.select_lookup8.lookup[x] as i32 + offset + 8
+        base + context.select_lookup_8.lookup[x] as i32 + offset + 8
     } else {
         // The `1` to find is in the first 8 bits.
 
         let x = ((ww as usize) & 0xff) << 3 | (find_ith as usize);
-        base + context.select_lookup8.lookup[x] as i32 + offset
+        base + context.select_lookup_8.lookup[x] as i32 + offset
     }
 }
 
@@ -196,7 +197,7 @@ pub fn select_2_s32_r64(
     words: &[u64],
     select_index: &[i32],
     rank_index: &[i32],
-    context: &LookupTable,
+    context: &Context,
     i: i32,
 ) -> (i32, i32) {
     //
@@ -244,12 +245,12 @@ pub fn select_2_s32_r64(
         // The `1` to find is in the second 8 bits.
 
         let x = (((ww as usize) >> 5) & 0x7f8) | ((find_ith - ones) as usize);
-        in_word_idx = context.select_lookup8.lookup[x as usize] as i32 + offset + 8;
+        in_word_idx = context.select_lookup_8.lookup[x as usize] as i32 + offset + 8;
     } else {
         // The `1` to find is in the first 8 bits.
 
         let x = ((ww as usize) & 0xff) << 3 | (find_ith as usize);
-        in_word_idx = context.select_lookup8.lookup[x] as i32 + offset;
+        in_word_idx = context.select_lookup_8.lookup[x] as i32 + offset;
     }
 
     in_word_idx += base as i32;

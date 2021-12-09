@@ -1,6 +1,6 @@
-use crate::index::BuildIndex;
-use crate::index::RankIndex;
-use crate::rank::RankIndex64;
+use crate::bitmap::index::BuildIndex;
+use crate::bitmap::index::RankIndex;
+use crate::bitmap::rank::RankIndex64;
 
 #[test]
 fn test_rank64() -> anyhow::Result<()> {
@@ -49,7 +49,7 @@ fn test_rank64() -> anyhow::Result<()> {
         // test building index
 
         let index = RankIndex64::build(&c.bm);
-        assert_eq!(c.want64, index.data);
+        assert_eq!(c.want64, index.index);
 
         // test rank 64
 

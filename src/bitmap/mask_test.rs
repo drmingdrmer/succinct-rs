@@ -2,7 +2,7 @@
 
 */
 
-use crate::mask::Masks;
+use crate::bitmap::mask::Masks;
 
 #[test]
 fn test_mask_and_upto() -> anyhow::Result<()> {

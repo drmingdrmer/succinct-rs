@@ -1,25 +1,25 @@
-use crate::index::BuildIndex;
-use crate::index::RankIndex;
+use crate::bitmap::index::BuildIndex;
+use crate::bitmap::index::RankIndex;
 
 #[derive(Debug, Clone)]
 pub struct RankIndex64 {
-    pub data: Vec<i32>,
+    pub index: Vec<i32>,
 }
 
 impl BuildIndex for RankIndex64 {
     fn build(words: &[u64]) -> Self {
         let index = build_rank64_index(words);
-        RankIndex64 { data: index }
+        RankIndex64 { index }
     }
 }
 
 impl RankIndex for RankIndex64 {
     fn count_ones(&self, words: &[u64], i: i32) -> (i32, i32) {
-        rank64(words, &self.data, i)
+        rank64(words, &self.index, i)
     }
 
-    fn get_rank_data(&self) -> &[i32] {
-        &self.data
+    fn get_rank_index(&self) -> &[i32] {
+        &self.index
     }
 }
 

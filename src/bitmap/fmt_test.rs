@@ -1,5 +1,5 @@
-use crate::fmt::fmt_bitmap;
-use crate::fmt::format_bits;
+use crate::bitmap::fmt::fmt_bitmap;
+use crate::bitmap::fmt::format_bits;
 
 #[test]
 fn test_fmt_one_word() -> anyhow::Result<()> {
